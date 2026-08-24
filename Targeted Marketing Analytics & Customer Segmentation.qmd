@@ -1,0 +1,347 @@
+---
+colorlinks: true
+code-line-numbers: true
+format:
+  docx: 
+    number-sections: true
+    toc: false
+    number-depth: 2
+    fontsize: 10pt
+    linestretch: 1.5
+knitr:
+  opts_chunk:
+    echo: true
+    warning: true
+    message: true
+    error: true
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r}
+#| echo: false
+# load the dataset by running this code block.
+pacman::p_load(dplyr,modelsummary,fixest)
+
+# complete the following to load the data for your own local file
+data_full <- read.csv("data_full.csv")
+```
+
+# Descriptive Analytics (20 pts)
+
+> ***Q1*** From `data_full`, generate a new variable, `final_price`, which is the actual retail price for each week (i.e., Recommended Retail Price after discounts). (**8pts**)
+
+-   Write your code below to generate final_price from RRP and discount. (**2pts**)
+
+```{r}
+# write your codes below
+# Final price is RRP after discounts
+data_full <- data_full %>%
+  mutate(final_price = RRP * (1 - discount))
+```
+
+-   Visualise using scatter plot the relationship between final price and sales. Tips: you can use `ggplot2` and `geom_point` to create the scatter plot. Write your code below to create the scatter plot. (**2pts**)
+
+```{r}
+# write your codes below
+# Load the package
+library(ggplot2)
+
+# Scatter plot shows the relationship between final_price and sales
+ggplot(data_full, aes(x = final_price, y = sales)) +  
+  geom_point(
+    alpha = 0.5,   # Set point transparency
+    color = "blue" # Set point color
+  ) +    
+  geom_smooth(
+        method = "lm", # Add a linear regression line
+        se = FALSE,    # Do not show confidence interval shading
+        color = "red"  # Set line color
+    ) +
+  labs(
+    title = "Final Price VS Sales", # Title
+    x = "Final Price",              # x-axis label
+    y = "Sales"                     # y-axis label
+  ) +
+  theme_minimal()  # theme
+
+```
+
+-   Do you observe a positive or negative relationship between final price and sales? Is this relationship causal? Why or why not? (**4pts**, 150 words)
+
+The scatterplot exhibits a positive relationship between final price and sales. However, this does not imply that increasing prices will raise sales. Instead, the pattern is driven by demand-related factors that influence both pricing and sales. For example,Amazon adjusts discounts when it expects higher demand, so higher prices tend to appear in high-demand weeks, creating a spurious positive correlation. Because these demand-related factors are not included in the scatterplot,the price variable becomes endogenous**.** Therefore, the upward-sloping pattern does not reflect the true causal effect of price on sales.
+
+> ***Q2.*** Use `dplyr` to compute the average weekly dollar sales (final price \* unit sales) for each brand across all weeks (i.e., the result should be 1 average per brand). Rank the brands from the highest average dollar sales to the lowest average dollar sales. (**6pts**) Which brand has the highest average weekly dollar sales? (**2pts**).
+
+```{r}
+# write you code below
+# Compute average weekly dollar sales per brand
+data_sales_by_brand <- data_full %>%
+  # Calculate weekly dollar sales
+  mutate(dollar_sales = final_price * sales) %>% 
+  # Group by brand
+  group_by(brand) %>% 
+  # Compute average
+  summarise(avg_weekly_dollar_sales = mean(dollar_sales)) %>% 
+  # Rank from descending order
+  arrange(desc(avg_weekly_dollar_sales))                
+
+```
+
+```{r}
+# please do not modify.
+# print out the ranking of brands based on average weekly dollar sales
+data_sales_by_brand
+```
+
+From the table, we can observe that Samsung has the highest average weekly dollar sales, with approximately 1.2M dollars.
+
+> ***Q3.*** In Marketing, we refer to brand equity as the additional sales a brand can obtain when everything else is equal, i.e., the causal effect of brands on sales. Does the above average sales ranking causally identify which brand has the highest brand equity? Why or why not? (**4pts**; 150 words)
+
+The ranking of average weekly sales cannot directly determine which brand has the highest brand equity. This is because the average sales are mixed with factors that differ between multiple brands. For example, each brand has different product functions, screen sizes, technical specifications, and price levels, while these variables will affect sales performance independently. In addition, there are differences in advertisement, discount rate, and supply between brands, which further affect the sales volume. Therefore, the sales ranking reflects the overall performance, instead of the independent contribution of the brand name itself. Without controlling the above-mentioned variables, the average sales cannot be used to identify brand equity. In other words, it is impossible to deduce which brand has the highest brand equity based on ranking alone.
+
+# Marketing Mix Modeling and Endogeneity (28pts)
+
+> ***Q4.*** Run a Marketing Mix Modeling linear regression as follows (**6pts**):
+
+-   Run the linear regression below using `fixest` package (Equation 1 hereinafter) (**2pts**).
+
+```{r}
+
+# write you codes for the regression below
+# sales = a + b * final_price + c * marketing_expense + error
+
+ols_1 <- feols(data = data_full,
+   # fml = dependent ~ independent variables
+     fml = sales ~ final_price + marketing_expense ) 
+```
+
+```{r}
+# do not modify the code below; this is to print out the results
+
+modelsummary(ols_1,
+             stars = T,
+             gof_map = c('nobs','r.squared'))
+```
+
+-   Interpret the coefficients of `final_price`, including coefficients and statistical significance (**4pts**).
+
+The coefficient on the final price is 0.618. This means that, controlling for marketing expenditure, a one-unit increase in the final retail price is associated with an increase of around 0.618 units in weekly sales. The estimate is highly statistically significant(p \< 0.001), which suggests that the relationship between price and sales is unlikely to be due to random variation.
+
+> ***Q5.*** Based on the regression coefficients reported above, discuss the endogeneity issues with `final_price` in Equation 1. For each endogeneity cause, explain the general definitions and then give concrete examples in Amazon's context. (**12pts**)
+
+-   General definition of each endogeneity cause (**6pts**, 200 words)
+
+There are three major causes of endogeneity, which are Omitted Variable Bias, Reverse Causality (Simultaneity), and Measurement Error.
+
+Omitted Variable Bias meansa factor that will affect both the independent variable and dependent variables is excluded from the regression model. Since the omitted factor influences both sides of the equation, the regressor becomes correlated with the error term.
+
+Reverse Causality refers to the phenomenon that the dependent variable will also affect the independent variable. If both variables mutually influence each other, we then call it simultaneity. In these cases, the regressor is jointly determined with the outcome. As a result, changes in the dependent variable feed back into the explanatory variable.
+
+Measurement Error occurs when the independent variable is measured with error, which creates random noise that becomes part of the error term, making the model not give us the true coefficients from the regression.
+
+These three causes of endogeneity violate the assumption that explanatory variables must be uncorrelated with the error term, making the OLS estimates biased and inconsistent.
+
+-   In Amazon's context, concrete examples to illustrate each endogeneity cause (**6pts**, 200 words)
+
+Omitted Variable Bias arises because important demand-related factors are not included in the equation. Product quality, popularity, advertisement, customer ratings, competitor promotions, stock availability, and release of limited-edition products, and so on, all influence both Amazon’s pricing mechanism and sales. Since these variables are excluded from the model, the estimated effect of final price absorbs their influence, leading to a biased and misleading correlation.
+
+Reverse Causality or Simultaneity is also highly relevant. Amazon uses an algorithm to adjust discounts based on expected demand. When a current trend, favorable external reviews, or high sales performance indicate rising demand, Amazon reduces discounts. This thereby raises the final price. At the same time, sales are directly affected by these prices, meaning that price and sales are jointly determined and violate the exogeneity condition.
+
+Measurement Error occurs if the recorded prices do not fully capture temporary promotions or offers. If the true transaction price differs from the recorded final price variable, the measurement error becomes part of the error term, causing a bias in the estimated coefficient.
+
+> ***Q6.*** If the discount each week in our dataset is randomized by Amazon each week, will Equation 1 give the causal effect of price on sales? Give your reasoning. (**6pts**; 200 words)
+
+If Amazon randomised the discount each week, then Equation 1 would be able to estimate the causal effect of price on sales. This is because when the discount is random, the final price no longer depends on factors such as product quality, popularity, expected demand, and so on. Even though different brands and products still matter for sales, they do not cause a problem as long as they do not influence discounts. In this situation, price becomes exogenous, meaning it is no longer linked to the hidden factors that raise or lower demand and are captured in the error term.
+
+Because of this, the problem of Omitted Variable Bias and Simultaneity is solved. Differences in sales across different price levels can then be explained by price itself, rather than by demand conditions or product characteristics. As a result, the regression could explain the causal effect of price on sales, similar to a randomized experiment.
+
+However, this conclusion holds only if the discount is truly random. If Amazon still adjusts discounts manually or by an algorithm, then endogeneity still exists, and Equation 1 would not capture the causal effect.
+
+> ***Q7.*** From the below regression designed by another data scientist, discuss whether customers always prefer larger screens (i.e., everything else being equal, a larger screen always leads to higher sales)? (**4pts**; 150 words)
+
+Based on the regression results, customers do not always prefer larger screens. Although all screen-size categories show positive effects on sales, the impact does not increase with size. The 50–59 inch group has the largest effect, with a coefficient of about 144, meaning that compared with the baseline group (screens under 40 inches), products in this size range sell around 144 more units. In contrast, screens above 60 inches have a smaller effect of about 82 units. This shows that after controlling for price, marketing expense, brand, resolution, HDR support, and other product features, the largest screens are not the best-sellers.
+
+Therefore, the relationship between screen size and sales is not just the bigger the better. Instead, demand reaches the peak at the mid-size range (50–59 inches). It suggests that customers prefer a balance between size, price, and other product features, not always choosing the biggest one.
+
+# Instrumental Variables (20pts)
+
+> ***Q8.*** One way to obtain causal effects of price on sales from secondary data is to use the instrumental variable method. (**12pts**)
+
+-   List two variables you you would collect as instrumental variables for `final_price`
+
+An instrumental variable (z) must satisfy three conditions:
+
+1.  Exogeneity: It must be exogenous and unrelated to the unobserved confounding factors.
+2.  Exclusion restriction:It must affect sales(y) only through final_price(x)
+3.  Relevance: It must be correlated with final_price (x), so that it can affect the price to some extent.
+
+The first instrumental variable I came up with is panel and chip prices. This variable is exogenous because changes in component costs are determined in the upstream supply chain and are not related to the unobserved factors that affect TV sales on Amazon. In terms of exclusion restriction, customers do not adjust their decisions based on panel or chip prices, so these costs influence sales only through their impact on the final retail price. Lastly, this instrument is relevant because when panel or chip prices increase, the overall cost of producing TVs rises, and sellers usually pass these higher costs on to consumers in the form of higher final prices. Therefore, component prices affect the final price but do not directly affect sales.
+
+Another potential instrumental variable is the international shipping cost. This variable is exogenous as changes in global shipping costs are driven by the international logistics market rather than by the factors that influence demand for TVs on Amazon. It also satisfies the exclusion restriction, since buyers do not adjust their purchasing behaviour based on freight rates, while shipping costs affect sales only by changing the final retail price. Finally, the instrument is relevant because higher shipping costs increase the total cost of acquiring TVs, making Amazon more likely to reduce discounts and set higher final prices. As a result, shipping costs are strongly related to the final price but do not directly affect sales.
+
+-   Can one use the VAT tax rate of TV products as an instrument variable for `final_price`? (**4pts**; 100 words)
+
+The VAT rate is not a valid instrumental variable because it violates the exclusion restriction. For exogeneity, VAT rates are set by the government and apply to the entire product category rather than to individual brands. In addition, they are not related to unobserved demand factors, so this condition could hold.
+
+For Relevance, VAT does affect the final price. The higher the VAT, the higher the final price. However, it may also directly influence consumers’ purchasing decisions because it changes the total amount they pay at checkout. This breaks the exclusion restriction. Therefore, VAT f is not a valid instrumental variable.
+
+> ***Q9.*** Assume you have identified one instrument variable `cost_shifter` in `data_full`. In the code blocks below, write down the two regressions you would need to run in order to estimate the causal effects of `final_price` on `sales`, including `marketing_expense` as the only control variable (**8pts**)
+
+-   Correct first stage codes and explanation of the code (**3pts**)
+
+-   Correct second stage codes and explanation of the codes (**3pts**)
+
+```{r}
+# show the estimation code below and describe the steps
+
+### Stage 1: write the first-stage regression  
+
+# Estimate how IV (cost_shifter) affects final_price
+# while controlling for marketing_expense
+ols_stage1 <- feols(
+    final_price ~ cost_shifter + marketing_expense,
+    data = data_full
+)
+
+# Generate the predicted values of final_price from Stage 1
+# These predictions represent the variation in price explained only by the instrument.
+data_full <- data_full %>%
+    mutate(
+        predicted_final_price = predict(ols_stage1, data_full)
+    )
+### Stage 2: write the second-stage regression 
+
+# Regress sales on the predicted final_price
+# while control for marketing_expense variable
+# This gives the causal effect of price on sales
+ols_stage2 <- feols(
+    sales ~ predicted_final_price + marketing_expense,
+    data = data_full
+) 
+  
+```
+
+```{r}
+# do not modify the code below; this is to print out the results
+
+modelsummary(list(
+  "First Stage" = ols_stage1,
+  "Second Stage" = ols_stage2
+),            
+stars = T, gof_map = c('nobs','r.squared'))
+```
+
+-   Based on the results of the two regressions, discuss the causal effect of `final_price` on `sales` (**2pts**)
+
+In the first stage, cost_shifter strongly affects final_price. Its coefficient is 1.099 (p \< 0.001), meaning a one-unit increase in the cost shifter increases final_price by about 1.10 units, controlling for marketing_expense. This confirms that the instrument is relevant.
+
+In the second stage, the coefficient on predicted_final_price is about –0.73 (p \< 0.001). Holding marketing_expense constant, this implies that increasing final_price by 1 unit reduces weekly sales by roughly 0.73 units. This represents the causal effect of price on sales after correcting for endogeneity.
+
+> ***Q10.*** Design the A/B/N testing (**20 pts**)
+
+**Step 1:**
+
+I chose individual-level randomization. Compared with household, device, or region-level randomization. Assigning treatments at the user level provides the largest number of independent units and minimizes spillovers across people. Device level is more granular, but it can create spillovers when multiple users share the same device. Region-level randomization greatly reduces the number of units and lowers statistical power.
+
+A drawback of user-level assignment is that some customers may have multiple devices or accounts, which could lead to a crossover effect. However, this can be mitigated by requiring users to log in with a unique account before accessing the experiment.
+
+**Step 2:**
+
+```{r}
+# Dummy code for randomisation
+
+set.seed(888)
+
+# create a dummy table. one row for one userid
+df_id <- data.frame(ID = 1:100000)
+
+N <- nrow(df_id)
+
+# Randomly sample 10% of all users to participate in the experiment
+sample_index <- sample(1:N, size = round(0.10 * N), replace = FALSE)
+
+df_id <- df_id %>%
+  mutate(
+    in_experiment = ifelse(ID %in% sample_index, 1, 0)   # 1 = selected into experiment; 0 = assigned to control group
+  )
+
+# Within the 10% experimental sample, randomly assign users to Treatment A or Treatment B
+# Users not selected in last step remain in the control group
+experiment_pool <- df_id %>% filter(in_experiment == 1)
+n_exp <- nrow(experiment_pool)
+
+# Randomly assign 50% of the experiment pool to A and 50% to B
+AB_assignment <- sample(c("A", "B"), size = n_exp, replace = TRUE)
+
+# Apply treatment labels to the dataset.
+df_id$Treatment <- "Control" # Default: all users start as control
+df_id$Treatment[df_id$in_experiment == 1] <- AB_assignment  # Replace with A/B for experimental users
+```
+
+Since A/B/N testing is costly and risky, I would not expose all 100,000 users to the test. I first draw a 10% random sample of eligible users, ensuring every customer has an equal probability of selection and preventing selection bias. Within this subsample, I then randomly assign users to Treatment A and Treatment B equally. The rest of the users in the database would be treated as the control group(no try-on).
+
+**Step 3:**
+
+```{r}
+pacman::p_load(pwr)
+# Calculating sample size
+
+# Define parameters
+effect_size <- 5/100 # Small effect size, difference in treatment/standard deviation
+alpha <- 0.05 # Significance level
+power <- 0.8 # Desired power
+
+# Calculate required sample size per group
+sample_size <- pwr.t.test(
+    d = effect_size,
+    sig.level = alpha,
+    power = power,
+    type = "two.sample",
+    alternative = "two.sided"
+)
+
+sample_size
+```
+
+To calculate the sample size, I compute the effect size using the expected spending lift. Since the smallest difference is £5 and the standard deviation is £100, the effect size is 0.05. I then use the *pwr* package in R to calculate the required sample for a two-sample t-test with α = 0.05 and power = 0.8. The result indicates that each treatment group needs roughly 6,281 users, which I round to 6,300 for both Treatment A and Treatment B. All remaining users (approximately 87,400) serve as the control group. Since the control group is much larger than the treatment group, the power for each treatment–control comparison will be at least as high as in this calculation.
+
+**Step 4:**
+
+I plan to collect two types of data:
+
+Demographic data (for randomization checks): age, gender, region, prime status, and historical spending. These variables ensure the three groups are comparable after randomization.
+
+Behavioral data (for treatment effect estimation): spending amount, number of items viewed, conversion rate, time spent interacting with the try-on function, and return rates.
+
+**Step 5:**
+
+After data collection, I first conduct randomization checks to confirm that demographic characteristics are balanced across the three groups. If imbalances exist, I run regression models controlling for confounding variables. To estimate treatment effects, I compare average outcomes across the three groups using a linear regression. This allows me to quantify whether Treatment A or B significantly increases spending relative to the control group and to determine which feature performs best.
+
+> ***Q11.*** Finally, Tom would like to study the causal effect of Amazon rating on product sales. For instance, what is the causal effect of a 4.5-star rating on sales compared to a 4-star rating. Propose **one** natural experiment method to study this causal question. (**12pts**)
+
+I would use a Regression Discontinuity Design (RDD) to identify the causal effect of star ratings on sales. This method works only when the cutoff is determined by a rule outside the seller’s control.
+
+Amazon uses fixed cutoff points to turn the underlying average rating into the number of stars shown to customers. When a product’s true average rating moves just above or below a cutoff, such as 4.24 and 4.25, it changes the displayed rating to 4 and 4.5 stars, even though the product quality is almost the same. Because sellers cannot precisely manipulate their average rating at high review volumes, crossing the threshold is effectively random. This allows us to estimate the causal effect of displaying 4.5 stars compared to 4 stars.
+
+For data collection, I need product-level data for all TVs whose underlying average rating is close to the bandwidth where the displayed stars change from 4.0 to 4.5, which includes:
+
+1.  True underlying average rating (eg, 4.24, 4.25,)
+2.  Displayed star rating (eg, 4.0, 4.5)
+3.  Weekly sales
+4.  Prices
+5.  Marketing expenditure
+6.  Other product features include brand, size, HDR function and etc.
+
+These data allow us to compare nearly identical products around the cutoff and isolate the effect of displayed stars.
+
+For statistical analyses, I would compare products just below the cutoff (eg, underlying rating 4.24 to 4.25) with those just above it (4.25 to 4.26). These products differ only in the displayed stars. We can estimate the causal effect by running a regression model, and the equation is described as follows:
+
+*Sales = a + b · High_Star + c · Price + d · Marketing_expense + Other control factors + Error*
+
+Where:
+
+1.  High_Star is a dummy variable. 1 if the product displays 4.5 stars, and 0 if it displays 4 stars.
+2.  b measures the sales difference between products displayed as 4 stars and those displayed as 4.5 stars.
+
+If b is positive and statistically significant, it means that displaying 4.5 stars causally increases sales relative to 4 stars.

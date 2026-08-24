@@ -1,0 +1,13 @@
+# R packages required to run Targeted_Marketing_Analytics___Customer_Segmentation.qmd
+# Install with:
+#   install.packages(c("pacman", "dplyr", "ggplot2", "fixest", "modelsummary", "pwr"))
+# or, since the script uses pacman for auto-loading:
+#   install.packages("pacman")
+#   pacman::p_load(dplyr, ggplot2, fixest, modelsummary, pwr)
+
+pacman         # dependency auto-install/load helper used throughout the script
+dplyr          # data wrangling (mutate, group_by, summarise, arrange)
+ggplot2        # scatter plot visualisation (final_price vs sales)
+fixest         # feols() — linear regression, 2SLS-style two-stage models
+modelsummary   # regression output tables
+pwr            # power analysis / sample size calculation for A/B testing
