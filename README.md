@@ -1,3 +1,4 @@
+# Targeted-Marketing-Analytics-Customer-Segmentation
 # Marketing Mix Modeling & Causal Inference: Price Effects on TV Sales
 
 An R analysis addressing a core marketing analytics question — what is the *causal* effect of price on sales? — using a weekly Amazon TV sales panel, moving from a naive OLS regression through endogeneity diagnosis, an instrumental variables (2SLS) correction, an A/B/N test design, and a regression discontinuity proposal for star ratings.
@@ -53,4 +54,4 @@ This produces a formatted Word (`.docx`) document with all code, regression tabl
 | Screen size | OLS with categorical screen-size controls | Non-monotonic effect; 50–59" segment performs best |
 | A/B/N test design | Power analysis (`pwr`), individual-level randomisation | ~6,300 users needed per treatment arm |
 | Star ratings | Regression Discontinuity Design (proposed) | Framework to isolate the causal effect of the 4 → 4.5 star display threshold |
-# Targeted-Marketing-Analytics-Customer-Segmentation
+
