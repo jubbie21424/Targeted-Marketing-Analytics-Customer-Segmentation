@@ -1,5 +1,4 @@
-# Targeted-Marketing-Analytics-Customer-Segmentation
-## Marketing Mix Modeling & Causal Inference: Price Effects on TV Sales
+# Marketing Mix Modeling & Causal Inference: Price Effects on TV Sales
 
 An R analysis addressing a core marketing analytics question — what is the *causal* effect of price on sales? — using a weekly Amazon TV sales panel, moving from a naive OLS regression through endogeneity diagnosis, an instrumental variables (2SLS) correction, an A/B/N test design, and a regression discontinuity proposal for star ratings.
 
